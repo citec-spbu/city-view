@@ -1,7 +1,7 @@
 #/***************************************************************************
 # TestPlugin
 #
-# test plugin
+# Test plugin with layer selection
 #							 -------------------
 #		begin				: 2023-11-22
 #		git sha				: $Format:%H$
