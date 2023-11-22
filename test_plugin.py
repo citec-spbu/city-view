@@ -67,7 +67,8 @@ class TestPlugin:
 
         # Check if plugin was started the first time in current QGIS session
         # Must be set in initGui() to survive plugin reloads
-        self.first_start = None
+        self.first_start = True
+        self.layer_added = False
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -190,8 +191,7 @@ class TestPlugin:
         if self.first_start == True:
             self.first_start = False
             self.dlg = TestPluginDialog()
-        
-        self.dlg.comboBox.addItems(['Дороги Санкт-Петербурга', 'Здания Санкт-Петербурга'])
+            self.dlg.comboBox.addItems(['Дороги Санкт-Петербурга', 'Здания Санкт-Петербурга'])
 
         # show the dialog
         self.dlg.show()
