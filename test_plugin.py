@@ -24,12 +24,14 @@
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
+from qgis.core import QgsVectorLayer, QgsProject
 
 # Initialize Qt resources from file resources.py
 from .resources import *
 # Import the code for the dialog
 from .test_plugin_dialog import TestPluginDialog
 import os.path
+import requests
 
 
 class TestPlugin:
@@ -188,13 +190,58 @@ class TestPlugin:
         if self.first_start == True:
             self.first_start = False
             self.dlg = TestPluginDialog()
+        
+        self.dlg.comboBox.addItems(['Дороги Санкт-Петербурга', 'Здания Санкт-Петербурга'])
 
         # show the dialog
         self.dlg.show()
         # Run the dialog event loop
         result = self.dlg.exec_()
-        # See if OK was pressed
+
         if result:
-            # Do something useful here - delete the line containing pass and
-            # substitute with your code.
-            pass
+            # Send the Overpass Turbo query
+            if self.dlg.comboBox.currentIndex() == 1:  # Check if "Здания Санкт-Петербурга" is selected
+                query = '''
+                [out:json];
+                area[name="Санкт-Петербург"]->.a;
+                way(area.a)["building"];
+                /*added by auto repair*/
+                (._;>;);
+                /*end of auto repair*/
+                out body;
+                '''
+            else:  # Use the existing query for "Дороги Санкт-Петербурга"
+                query = '''
+                [out:json];
+                area[name="Санкт-Петербург"]->.a;
+                way(area.a)["highway"="primary"];
+                /*added by auto repair*/
+                (._;>;);
+                /*end of auto repair*/
+                out body;
+                '''
+
+            url = 'https://overpass-api.de/api/interpreter'
+            data = {
+                'data': query
+            }
+
+            response = requests.post(url, data=data)
+
+            if self.dlg.comboBox.currentIndex() == 1:  # Check if "Здания Санкт-Петербурга" is selected
+                layer_name = "Buildings of Saint Petersburg"
+            else:
+                layer_name = "Roads of Saint Petersburg"
+            
+            layer_out = QgsVectorLayer(response.content.decode(), layer_name, "ogr")
+
+            if layer_out.isValid():
+                QgsProject.instance().addMapLayer(layer_out)
+                print("Layer successfully added")
+                # Zoom to the layer extent
+                canvas = iface.mapCanvas()
+                canvas.setExtent(layer_out.extent())
+                canvas.refresh()
+            else:
+                print("Error adding layer")
+
