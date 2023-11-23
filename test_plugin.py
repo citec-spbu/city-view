@@ -32,6 +32,7 @@ from .resources import *
 from .test_plugin_dialog import TestPluginDialog
 import os.path
 import requests
+import json
 
 
 class TestPlugin:
@@ -245,3 +246,66 @@ class TestPlugin:
             else:
                 print("Error adding layer")
 
+    # def run(self):
+    #     """Run method that performs all the real work"""
+
+    #     # Create the dialog with elements (after translation) and keep reference
+    #     # Only create GUI ONCE in callback, so that it will only load when the plugin is started
+    #     if self.first_start == True:
+    #         self.first_start = False
+    #         self.dlg = TestPluginDialog()
+    #         self.dlg.comboBox.addItems(['Дороги Санкт-Петербурга', 'Здания Санкт-Петербурга'])
+
+    #     # show the dialog
+    #     self.dlg.show()
+    #     # Run the dialog event loop
+    #     result = self.dlg.exec_()
+
+    #     if result:
+    #         # Send the Overpass Turbo query
+    #         if self.dlg.comboBox.currentIndex() == 1:  # Check if "Здания Санкт-Петербурга" is selected
+    #             query = '''
+    #             [out:json];
+    #             area[name="Санкт-Петербург"]->.a;
+    #             way(area.a)["building"];
+    #             /*added by auto repair*/
+    #             (._;>;);
+    #             /*end of auto repair*/
+    #             out body;
+    #             '''
+    #         else:  # Use the existing query for "Дороги Санкт-Петербурга"
+    #             query = '''
+    #             [out:json];
+    #             area[name="Санкт-Петербург"]->.a;
+    #             way(area.a)["highway"="primary"];
+    #             /*added by auto repair*/
+    #             (._;>;);
+    #             /*end of auto repair*/
+    #             out body;
+    #             '''
+
+    #         url = 'https://overpass-api.de/api/interpreter'
+    #         data = {
+    #             'data': query
+    #         }
+
+    #         response = requests.post(url, data=data)
+
+    #         geojson_data = response.json()
+
+    #         if self.dlg.comboBox.currentIndex() == 1:  # Check if "Здания Санкт-Петербурга" is selected
+    #             layer_name = "Buildings of Saint Petersburg"
+    #         else:
+    #             layer_name = "Roads of Saint Petersburg"
+
+    #         geojson_layer = QgsVectorLayer(json.dumps(geojson_data), layer_name, "ogr")
+
+    #         if geojson_layer.isValid():
+    #             QgsProject.instance().addMapLayer(geojson_layer)
+    #             print("Layer successfully added")
+    #             # Zoom to the layer extent
+    #             canvas = iface.mapCanvas()
+    #             canvas.setExtent(geojson_layer.extent())
+    #             canvas.refresh()
+    #         else:
+    #             print("Error adding layer")
