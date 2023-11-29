@@ -68,16 +68,48 @@ class TestPluginDialog(QtWidgets.QDialog, FORM_CLASS):
         # ибо пока тут просто некоторые типы haiway
         self.typeComboBox.addItem("motorway")
         self.typeComboBox.addItem("trunk")
+        self.typeComboBox.addItem("primary")
+        self.typeComboBox.addItem("secondary")
+        self.typeComboBox.addItem("tertiary")
+        self.typeComboBox.addItem("unclassified")
+        self.typeComboBox.addItem("residential")
+        self.typeComboBox.addItem("road")
+        self.typeComboBox.addItem("living_street")
+        self.typeComboBox.addItem("service")
+        self.typeComboBox.addItem("pedestrian")
 
         # выбор города (пока можно настроить 2 вида)
         self.cityComboBox.addItem("Санкт-Петербург")
         self.cityComboBox.addItem("Москва")
+        self.cityComboBox.addItem("Новосибирск")
+        self.cityComboBox.addItem("Екатеринбург")
+        self.cityComboBox.addItem("Казань")
+        self.cityComboBox.addItem("Нижний Новгород")
+        self.cityComboBox.addItem("Красноярск")
+        self.cityComboBox.addItem("Челябинск")
+        self.cityComboBox.addItem("Самара")
+        self.cityComboBox.addItem("Уфа")
+        self.cityComboBox.addItem("Ростов-на-Дону")
+        self.cityComboBox.addItem("Краснодар")
+        self.cityComboBox.addItem("Омск")
+        self.cityComboBox.addItem("Воронеж")
+        self.cityComboBox.addItem("Пермь")
+        self.cityComboBox.addItem("Волгоград")
 
         # self.addOSMLayerCheckBox.setChecked() # попытка добавить функцию add_osm_layer из TestPlugin
 
     def add_row(self):
-        # добавляем новую строку в таблицу
-        self.model.insertRow(self.model.rowCount())
+        selected_layer = self.layerComboBox.currentText() # выбираем слой из layerComboBox
+        
+        selected_type = self.typeComboBox.currentText() # выбираем тип
+        selected_city = self.cityComboBox.currentText() # выбираем город
+        
+        # создаем объекты QStandardItem для каждой колонки
+        layer_item = QtGui.QStandardItem(selected_layer)
+        type_item = QtGui.QStandardItem(selected_type)
+        city_item = QtGui.QStandardItem(selected_city)
+        
+        self.model.appendRow([layer_item, type_item, city_item]) # добавляем элементы в таблицу
 
     def delete_row(self):
         # удаляем строку в таблице
