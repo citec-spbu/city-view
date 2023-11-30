@@ -21,16 +21,72 @@
  *                                                                         *
  ***************************************************************************/
 """
-
+import json
 import os
 
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
 from qgis.PyQt import QtGui
+from qgis.core import QgsVectorLayer, QgsProject, QgsRasterLayer
+
+from .helpers import download_city_road_network, download_city_buildings
 
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
     os.path.dirname(__file__), 'test_plugin_dialog_base.ui'))
+
+_BUILDING_TAG_VALUES = [
+    "apartments",
+    "barracks",
+    "bungalow",
+    "cabin",
+    "detached",
+    "dormitory",
+    "farm",
+    "hotel",
+    "house",
+    "residential",
+    "commercial",
+    "industrial",
+    "retail",
+    "supermarket",
+    "warehouse",
+    "cathedral",
+    "chapel",
+]
+
+_HIGHWAY_TAG_VALUES = [
+    "motorway",
+    "trunk",
+    "primary",
+    "secondary",
+    "tertiary",
+    "unclassified",
+    "residential",
+    "road",
+    "living_street",
+    "service",
+    "pedestrian",
+]
+
+_CITY_VALUES = [
+    "Санкт-Петербург",
+    "Москва",
+    "Новосибирск",
+    "Екатеринбург",
+    "Казань",
+    "Нижний Новгород",
+    "Красноярск",
+    "Челябинск",
+    "Самара",
+    "Уфа",
+    "Ростов-на-Дону",
+    "Краснодар",
+    "Омск",
+    "Воронеж",
+    "Пермь",
+    "Волгоград",
+]
 
 
 class TestPluginDialog(QtWidgets.QDialog, FORM_CLASS):
@@ -43,73 +99,65 @@ class TestPluginDialog(QtWidgets.QDialog, FORM_CLASS):
         # http://qt-project.org/doc/qt-4.8/designer-using-a-ui-file.html
         # #widgets-and-dialogs-with-auto-connect
         self.setupUi(self)
-        
+
         # добавляем элементы таблицы
-        self.model = QtGui.QStandardItemModel(0, 4, self)
-        self.model.setHorizontalHeaderLabels(['Layer', 'Type', 'Add', 'Delete'])
+        self.model = QtGui.QStandardItemModel(0, 3, self)
+        self.model.setHorizontalHeaderLabels(['Layer', 'Type', 'City'])
         self.tableView.setModel(self.model)
-        # self.addOSMLayerCheckBox.toggled.connect(self.toggle_osm_layer) # для загрузки OSM Layer
+        self.checkBox.toggled.connect(self.toggle_osm_layer)  # для загрузки OSM Layer
 
         # добавляем соответствующие виджеты
         self.addButton.clicked.connect(self.add_row)
         self.deleteButton.clicked.connect(self.delete_row)
         self.resetButton.clicked.connect(self.reset_table)
+        self.buttonBox.accepted.connect(self.handle_add_layers)
 
         # растягиваем столбцы на всю таблицу
         header = self.tableView.horizontalHeader()
         header.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
 
         # часть с выбором для дорог и зданий
-        self.layerComboBox.addItem("haiway")
+        self.layerComboBox.addItem("highway")
         self.layerComboBox.addItem("building")
+        self.layerComboBox.currentTextChanged.connect(self._update_type_combo_box_variants)
 
-        # тут нужно подумать как можно при выборе haiway - выдавать перечень типов haiway
+        self._update_type_combo_box_variants()
+        self._update_city_combo_box_variants()
+
+    def _update_type_combo_box_variants(self) -> None:
+        # тут нужно подумать как можно при выборе highway - выдавать перечень типов highway
         # а при выборе building на предыдущем этапе выдавать перечень building
-        # ибо пока тут просто некоторые типы haiway
-        self.typeComboBox.addItem("motorway")
-        self.typeComboBox.addItem("trunk")
-        self.typeComboBox.addItem("primary")
-        self.typeComboBox.addItem("secondary")
-        self.typeComboBox.addItem("tertiary")
-        self.typeComboBox.addItem("unclassified")
-        self.typeComboBox.addItem("residential")
-        self.typeComboBox.addItem("road")
-        self.typeComboBox.addItem("living_street")
-        self.typeComboBox.addItem("service")
-        self.typeComboBox.addItem("pedestrian")
+        # ибо пока тут просто некоторые типы highway
+        self.typeComboBox.clear()
 
+        selected_layer = self.layerComboBox.currentText()
+
+        tag_values = {
+            "highway": _HIGHWAY_TAG_VALUES,
+            "building": _BUILDING_TAG_VALUES,
+        }
+
+        for tag_value in tag_values[selected_layer]:
+            self.typeComboBox.addItem(tag_value)
+
+    def _update_city_combo_box_variants(self) -> None:
         # выбор города (пока можно настроить 2 вида)
-        self.cityComboBox.addItem("Санкт-Петербург")
-        self.cityComboBox.addItem("Москва")
-        self.cityComboBox.addItem("Новосибирск")
-        self.cityComboBox.addItem("Екатеринбург")
-        self.cityComboBox.addItem("Казань")
-        self.cityComboBox.addItem("Нижний Новгород")
-        self.cityComboBox.addItem("Красноярск")
-        self.cityComboBox.addItem("Челябинск")
-        self.cityComboBox.addItem("Самара")
-        self.cityComboBox.addItem("Уфа")
-        self.cityComboBox.addItem("Ростов-на-Дону")
-        self.cityComboBox.addItem("Краснодар")
-        self.cityComboBox.addItem("Омск")
-        self.cityComboBox.addItem("Воронеж")
-        self.cityComboBox.addItem("Пермь")
-        self.cityComboBox.addItem("Волгоград")
-
-        # self.addOSMLayerCheckBox.setChecked() # попытка добавить функцию add_osm_layer из TestPlugin
+        self.cityComboBox.clear()
+        for city in _CITY_VALUES:
+            self.cityComboBox.addItem(city)
 
     def add_row(self):
-        selected_layer = self.layerComboBox.currentText() # выбираем слой из layerComboBox
-        
-        selected_type = self.typeComboBox.currentText() # выбираем тип
-        selected_city = self.cityComboBox.currentText() # выбираем город
-        
+        selected_layer = self.layerComboBox.currentText()  # выбираем слой из layerComboBox
+
+        selected_type = self.typeComboBox.currentText()  # выбираем тип
+        selected_city = self.cityComboBox.currentText()  # выбираем город
+
         # создаем объекты QStandardItem для каждой колонки
         layer_item = QtGui.QStandardItem(selected_layer)
         type_item = QtGui.QStandardItem(selected_type)
         city_item = QtGui.QStandardItem(selected_city)
-        
-        self.model.appendRow([layer_item, type_item, city_item]) # добавляем элементы в таблицу
+
+        self.model.appendRow([layer_item, type_item, city_item])  # добавляем элементы в таблицу
 
     def delete_row(self):
         # удаляем строку в таблице
@@ -117,21 +165,57 @@ class TestPluginDialog(QtWidgets.QDialog, FORM_CLASS):
         for index in sorted(indices):
             self.model.removeRow(index.row())
 
-    # def toggle_osm_layer(self, checked):
-    #     if checked:
-    #         # запускаем add_osm_layer из TestPlugin 
-    #         test_plugin.add_osm_layer()
-    #     else:
-    #         # отключаем слой OSM
-    #         pass
+    def toggle_osm_layer(self):
+        layer_name = "OSM Layer"
+        if self.addOSMLayerCheckBox.isChecked():
+            osm_layer = QgsRasterLayer(
+                "type=xyz&url=https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                layer_name,
+                "wms"
+            )
+            if not osm_layer.isValid():
+                print("Error")
+            else:
+                QgsProject.instance().addMapLayer(osm_layer,
+                                                  False)  # Добавляем слой без автоматического перерисовывания
+                QgsProject.instance().layerTreeRoot().insertChildNode(0, QgsLayerTreeLayer(
+                    osm_layer))  # Вставляем слой в самый низ
+                osm_layer.triggerRepaint()  # Перерисовываем слой
+        else:
+            # отключаем слой OSM
+            osm_layer = QgsProject.instance().mapLayersByName(layer_name)
+            if osm_layer:
+                QgsProject.instance().removeMapLayer(osm_layer[0])
 
     def reset_table(self):
         # Очищаем все строки таблицы
         self.model.removeRows(0, self.model.rowCount())
-        
+
         # Сбрасываем виджеты к начальному состоянию
         self.cityComboBox.setCurrentIndex(0)
         self.layerComboBox.setCurrentIndex(0)
-        # self.addOSMLayerCheckBox.setChecked(False) # нужно сделать так чтобы reset все сбрасывал
+        self.checkBox.setChecked(False) # нужно сделать так чтобы reset все сбрасывал
 
-        
+    def handle_add_layers(self):
+        for i in range(self.model.rowCount()):
+            layer_item = self.model.item(i, 0)
+            type_item = self.model.item(i, 1)
+            city_item = self.model.item(i, 2)
+
+            if layer_item is None or type_item is None or city_item is None:
+                continue
+
+            layer_name = layer_item.text()
+            type_name = type_item.text()
+            city_name = city_item.text()
+
+            print(f"Загружаем данные: {layer_name=}, {type_name=}, {city_name=}")
+            if layer_name == "highway":
+                data = download_city_road_network(city_name, [type_name])
+            elif layer_name == "building":
+                data = download_city_buildings(city_name, [type_name])
+            else:
+                continue
+
+            vl = QgsVectorLayer(json.dumps(data), f"{layer_name=}_{type_name=}_{city_name=}", "ogr")
+            QgsProject.instance().addMapLayer(vl)

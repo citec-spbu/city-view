@@ -196,7 +196,7 @@ class TestPlugin:
     def run(self): # основной метод через который осуществляется запуск
         if self.first_start == True:
             self.first_start = False
-            self.add_osm_layer()
+            # self.add_osm_layer()
             self.dlg = TestPluginDialog()
             # self.dlg.cityComboBox.addItems(['Санкт-Петербург', 'Москва']) # не уверена, но можно и таким образом перечень добавить
 
