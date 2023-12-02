@@ -27,7 +27,7 @@ import os
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
 from qgis.PyQt import QtGui
-from qgis.core import QgsVectorLayer, QgsProject, QgsRasterLayer
+from qgis.core import QgsVectorLayer, QgsProject, QgsRasterLayer, QgsLayerTreeLayer
 
 from .helpers import download_city_road_network, download_city_buildings
 
@@ -167,7 +167,7 @@ class TestPluginDialog(QtWidgets.QDialog, FORM_CLASS):
 
     def toggle_osm_layer(self):
         layer_name = "OSM Layer"
-        if self.addOSMLayerCheckBox.isChecked():
+        if self.checkBox.isChecked():
             osm_layer = QgsRasterLayer(
                 "type=xyz&url=https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                 layer_name,
@@ -176,10 +176,15 @@ class TestPluginDialog(QtWidgets.QDialog, FORM_CLASS):
             if not osm_layer.isValid():
                 print("Error")
             else:
-                QgsProject.instance().addMapLayer(osm_layer,
-                                                  False)  # Добавляем слой без автоматического перерисовывания
-                QgsProject.instance().layerTreeRoot().insertChildNode(0, QgsLayerTreeLayer(
-                    osm_layer))  # Вставляем слой в самый низ
+                proj = QgsProject.instance()
+                proj.addMapLayer(
+                    osm_layer,
+                    False,
+                )  # Добавляем слой без автоматического перерисовывания
+                proj.layerTreeRoot().insertChildNode(
+                    -1,
+                    QgsLayerTreeLayer(osm_layer),
+                )  # Вставляем слой в самый низ
                 osm_layer.triggerRepaint()  # Перерисовываем слой
         else:
             # отключаем слой OSM
@@ -194,7 +199,7 @@ class TestPluginDialog(QtWidgets.QDialog, FORM_CLASS):
         # Сбрасываем виджеты к начальному состоянию
         self.cityComboBox.setCurrentIndex(0)
         self.layerComboBox.setCurrentIndex(0)
-        self.checkBox.setChecked(False) # нужно сделать так чтобы reset все сбрасывал
+        self.checkBox.setChecked(False)  # нужно сделать так чтобы reset все сбрасывал
 
     def handle_add_layers(self):
         for i in range(self.model.rowCount()):
