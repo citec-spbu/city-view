@@ -29,6 +29,9 @@ from qgis.PyQt import QtWidgets
 from qgis.PyQt import QtGui
 from qgis.core import QgsVectorLayer, QgsProject, QgsRasterLayer, QgsLayerTreeLayer
 
+from PyQt5.QtGui import QStandardItemModel, QStandardItem
+from PyQt5.QtCore import Qt
+
 from .helpers import download_city_road_network, download_city_buildings
 
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
@@ -125,9 +128,6 @@ class TestPluginDialog(QtWidgets.QDialog, FORM_CLASS):
         self._update_city_combo_box_variants()
 
     def _update_type_combo_box_variants(self) -> None:
-        # тут нужно подумать как можно при выборе highway - выдавать перечень типов highway
-        # а при выборе building на предыдущем этапе выдавать перечень building
-        # ибо пока тут просто некоторые типы highway
         self.typeComboBox.clear()
 
         selected_layer = self.layerComboBox.currentText()
@@ -136,28 +136,51 @@ class TestPluginDialog(QtWidgets.QDialog, FORM_CLASS):
             "highway": _HIGHWAY_TAG_VALUES,
             "building": _BUILDING_TAG_VALUES,
         }
+        self.typeComboBox.setModel(QStandardItemModel(self.typeComboBox))
 
         for tag_value in tag_values[selected_layer]:
-            self.typeComboBox.addItem(tag_value)
+            item = QStandardItem(tag_value)
+            item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+            item.setData(Qt.Unchecked, Qt.CheckStateRole)
+            self.typeComboBox.model().appendRow(item)
 
     def _update_city_combo_box_variants(self) -> None:
-        # выбор города (пока можно настроить 2 вида)
         self.cityComboBox.clear()
         for city in _CITY_VALUES:
             self.cityComboBox.addItem(city)
 
-    def add_row(self):
-        selected_layer = self.layerComboBox.currentText()  # выбираем слой из layerComboBox
+    def add_row(self): 
+        selected_layer = self.layerComboBox.currentText() 
+        selected_city = self.cityComboBox.currentText()
 
-        selected_type = self.typeComboBox.currentText()  # выбираем тип
-        selected_city = self.cityComboBox.currentText()  # выбираем город
+        type_indexes = self.typeComboBox.model().match(
+            self.typeComboBox.model().index(0, 0),
+            Qt.CheckStateRole,
+            Qt.Checked,
+            -1,
+            Qt.MatchExactly
+        )
 
-        # создаем объекты QStandardItem для каждой колонки
-        layer_item = QtGui.QStandardItem(selected_layer)
-        type_item = QtGui.QStandardItem(selected_type)
-        city_item = QtGui.QStandardItem(selected_city)
+        if not hasattr(self, 'selected_types_dict'): # словарь для хранения уже выбранных пар - чтобы не повторялись
+            self.selected_types_dict = dict() 
 
-        self.model.appendRow([layer_item, type_item, city_item])  # добавляем элементы в таблицу
+        if selected_layer not in self.selected_types_dict: # если слоя нет - добавляем
+            self.selected_types_dict[selected_layer] = set() 
+
+        selected_types = set()
+        for index in type_indexes:
+            selected_type = self.typeComboBox.model().itemFromIndex(index).text()
+
+            if selected_type not in self.selected_types_dict[selected_layer]: # добавляем тип, если его еще нет в множестве
+                selected_types.add(selected_type)
+                self.selected_types_dict[selected_layer].add(selected_type)
+
+        for selected_type in selected_types:
+            layer_item = QtGui.QStandardItem(selected_layer)
+            type_item = QtGui.QStandardItem(selected_type)
+            city_item = QtGui.QStandardItem(selected_city)
+
+            self.model.appendRow([layer_item, type_item, city_item])
 
     def delete_row(self):
         # удаляем строку в таблице
@@ -166,42 +189,41 @@ class TestPluginDialog(QtWidgets.QDialog, FORM_CLASS):
             self.model.removeRow(index.row())
 
     def toggle_osm_layer(self):
-        layer_name = "OSM Layer"
-        if self.checkBox.isChecked():
+        selected_layer = self.layerComboBox.currentText() 
+        if selected_layer == "OSM Layer" and self.checkBox.isChecked():
             osm_layer = QgsRasterLayer(
-                "type=xyz&url=https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-                layer_name,
-                "wms"
-            )
-            if not osm_layer.isValid():
-                print("Error")
-            else:
-                proj = QgsProject.instance()
+                "type=xyz&url=https://tile.openstreetmap.org/{z}/{x}/{y}.png",  
+                selected_layer,  
+                "wms"  
+            )  
+            if osm_layer.isValid():  
+                proj = QgsProject.instance()  
                 proj.addMapLayer(
-                    osm_layer,
+                    osm_layer,  
                     False,
-                )  # Добавляем слой без автоматического перерисовывания
+                )  
                 proj.layerTreeRoot().insertChildNode(
-                    -1,
-                    QgsLayerTreeLayer(osm_layer),
-                )  # Вставляем слой в самый низ
-                osm_layer.triggerRepaint()  # Перерисовываем слой
-        else:
-            # отключаем слой OSM
-            osm_layer = QgsProject.instance().mapLayersByName(layer_name)
-            if osm_layer:
-                QgsProject.instance().removeMapLayer(osm_layer[0])
+                    -1,  
+                    QgsLayerTreeLayer(osm_layer),  
+                )  
+                osm_layer.triggerRepaint()  
+            else:
+                print("Error") 
+        else:  
+            osm_layer = QgsProject.instance().mapLayersByName(selected_layer)  
+            if osm_layer:  
+                QgsProject.instance().removeMapLayer(osm_layer[0])  
 
     def reset_table(self):
-        # Очищаем все строки таблицы
-        self.model.removeRows(0, self.model.rowCount())
-
-        # Сбрасываем виджеты к начальному состоянию
-        self.cityComboBox.setCurrentIndex(0)
+        self.model.removeRows(0, self.model.rowCount())  
+        self.cityComboBox.setCurrentIndex(0)  
         self.layerComboBox.setCurrentIndex(0)
-        self.checkBox.setChecked(False)  # нужно сделать так чтобы reset все сбрасывал
+        # Добавлен сброс пунктов в списке типов:
+        for i in range(self.typeComboBox.model().rowCount()):
+            self.typeComboBox.model().item(i).setCheckState(Qt.Unchecked)
+        self.checkBox.setChecked(False)
 
-    def handle_add_layers(self):
+    def handle_add_layers(self): # загружаются данные для каждого элемента в таблице
         for i in range(self.model.rowCount()):
             layer_item = self.model.item(i, 0)
             type_item = self.model.item(i, 1)
